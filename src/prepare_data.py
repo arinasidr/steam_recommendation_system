@@ -37,7 +37,7 @@ metadata = pd.read_json(
 
 metadata = metadata[
     metadata["app_id"].isin(app_ids)
-][["app_id", "tags"]]
+][["app_id", "tags", "description"]]
 
 games = pd.read_csv(
     f"{RAW}/games.csv",
