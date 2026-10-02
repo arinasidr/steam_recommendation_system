@@ -29,21 +29,77 @@ i_idx = {int(a): i for i, a in enumerate(app_ids)}
 df["u"] = df.user_id.map(u_idx)
 df["i"] = df.app_id.map(i_idx)
 
-# 4. train/test: у каждого пользователя прячем 20% игр
+# 4. метаданные выбранных игр
+metadata = pd.read_json(
+    f"{RAW}/games_metadata.json",
+    lines=True
+)
+
+metadata = metadata[
+    metadata["app_id"].isin(app_ids)
+][["app_id", "tags", "description"]]
+
+games = pd.read_csv(
+    f"{RAW}/games.csv",
+    usecols=["app_id", "title"]
+)
+
+game_info = pd.DataFrame({"app_id": app_ids})
+
+game_info = game_info.merge(
+    games,
+    on="app_id",
+    how="left"
+)
+
+game_info = game_info.merge(
+    metadata,
+    on="app_id",
+    how="left"
+)
+
+print("игр без записи в metadata:", game_info["tags"].isna().sum())
+
+print(
+    "игр с пустым списком tags:",
+    game_info["tags"].apply(
+        lambda tags: isinstance(tags, list) and len(tags) == 0
+    ).sum()
+)
+
+game_info["tags"] = game_info["tags"].apply(
+    lambda tags: tags if isinstance(tags, list) else []
+)
+
+print("метаданных игр:", len(game_info))
+print("без названия:", game_info["title"].isna().sum())
+print("без тегов:", (game_info["tags"].str.len() == 0).sum())
+
+# 5. train/test: у каждого пользователя прячем 20% игр
 df = df.sample(frac=1, random_state=SEED)
 df["pos"] = df.groupby("u").cumcount()
 n = df.groupby("u")["u"].transform("size")
 df["is_test"] = df["pos"] >= np.floor(n * (1 - TEST_FRAC) + 1e-9)
 train, test = df[~df.is_test], df[df.is_test]
 
-# 5. сохраняем
+# 6. сохраняем
 os.makedirs(OUT, exist_ok=True)
+
 X = csr_matrix((1 + np.log1p(train.hours.values), (train.u.values, train.i.values)),
                shape=(len(user_ids), len(app_ids)))
+
 save_npz(f"{OUT}/train.npz", X)
+
 test[["u", "i"]].to_parquet(f"{OUT}/test.parquet")
+
 json.dump({"user_ids": [int(x) for x in user_ids], "app_ids": [int(x) for x in app_ids]},
           open(f"{OUT}/mappings.json", "w"))
+
+game_info.to_parquet(
+    f"{OUT}/games.parquet",
+    index=False
+)
+
 print("users:", len(user_ids), "games:", len(app_ids),
       "train:", len(train), "test:", len(test),
       "sparsity: %.4f%%" % (100 * len(df) / (len(user_ids) * len(app_ids))))
