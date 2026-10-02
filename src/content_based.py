@@ -2,8 +2,15 @@ from common import load_data, evaluate
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy import sparse
+import os
 
 X, test_sets, maps = load_data()
+results = []
+
+def log_result(name, metrics):
+    print(f"{name}:", metrics)
+    results.append({"variant": name, **metrics})
+
 games = pd.read_parquet("data/processed/games.parquet")
 
 #реализуем TF-IDF: преобразуем теги в числа, чтобы сравнивать игры математически
@@ -33,7 +40,7 @@ print(scores.shape)
 
 # оцениваем, насколько каждая игра подходит каждому пользователю
 metrics = evaluate(scores, X, test_sets)
-print(metrics)
+log_result("content-based (теги, с учётом часов)", metrics)
 
 #получили метрики, сейчас они не очень, попробуем поэксперементировать внутри этого подхода
 #улучшение 1: строим профиль только по факту взаимодействия с игрой, не учитывая количество часов
@@ -55,7 +62,7 @@ metrics_binary = evaluate(
     test_sets
 )
 
-print("content-based без учета часов:", metrics_binary)
+log_result("content-based (теги) без учёта часов", metrics_binary)
 
 #улучшение 2: добавляем к тегам описания игр
 # пустые описания заменяем пустой строкой
@@ -90,7 +97,8 @@ metrics_combined = evaluate(
     test_sets
 )
 
-print(
-    "content-based с тегами и описаниями:",
-    metrics_combined
-)
+log_result("content-based, теги + описания", metrics_combined)
+
+os.makedirs("results", exist_ok=True)
+pd.DataFrame(results).to_csv("results/content_based.csv", index=False)
+print("результаты сохранены в results/content_based.csv")

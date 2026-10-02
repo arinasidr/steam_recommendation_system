@@ -2,8 +2,16 @@ from common import load_data, evaluate
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 import numpy as np
+import os
+import pandas as pd
 
 X, test_sets, maps = load_data()
+
+results = []
+
+def log_result(name, metrics):
+    print(f"{name}:", metrics)
+    results.append({"variant": name, **metrics})
 
 #поиск соседей
 N_NEIGHBORS = 50
@@ -57,7 +65,7 @@ metrics = evaluate(
     test_sets
 )
 
-print("user-based CF:", metrics)
+log_result("user-based CF (с учётом часов)", metrics)
 
 #получили метрики, они нас устраивают, но все равно
 #попробуем поэксперементировать внутри этого подхода
@@ -110,7 +118,7 @@ metrics_binary = evaluate(
     test_sets
 )
 
-print("user-based CF без учета часов:", metrics_binary)
+log_result("user-based CF без учёта часов", metrics_binary)
 
 
 # улучшение 2: проверяем разное количество соседей
@@ -163,7 +171,8 @@ for n_neighbors in [20, 50, 100, 150, 200]:
         n_neighbors
     )
 
-    print(
-        f"user-based CF, {n_neighbors} соседей:",
-        metrics_k
-    )
+    log_result(f"user-based CF без часов, {n_neighbors} соседей", metrics_k)
+
+os.makedirs("results", exist_ok=True)
+pd.DataFrame(results).to_csv("results/user_based.csv", index=False)
+print("результаты сохранены в results/user_based.csv")
