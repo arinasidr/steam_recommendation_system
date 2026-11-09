@@ -7,3 +7,4 @@ pyarrow
 jupyter
 torch
 faiss-cpu
+sentence-transformers
